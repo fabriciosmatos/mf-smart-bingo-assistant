@@ -1,0 +1,12 @@
+{
+  "name": "Bingo Pro: Gestão Inteligente",
+  "description": "Sistema mobile-first de gestão de múltiplas cartelas de bingo com OCR, detecção automática de vitórias e vibração.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "OCR",
+    "PWA",
+    "Real-time notifications"
+  ]
+}

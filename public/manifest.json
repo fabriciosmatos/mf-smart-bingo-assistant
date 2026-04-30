@@ -1,0 +1,17 @@
+{
+  "name": "Bingo Pro: Gestão Inteligente",
+  "short_name": "Bingo Pro",
+  "description": "Gestão de bingo com OCR e notificações em tempo real.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F5F5F0",
+  "theme_color": "#5A5A40",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3593/3593457.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
