@@ -35,7 +35,7 @@ export function CartelaGrid({ cartela, onExcluir, onDismissVitoria }: Props) {
                     cartela.vitoria.quadra;
 
   return (
-    <div className={`bg-slate-800 rounded-xl border-t-4 transition-all shadow-2xl flex flex-col gap-2 p-3 ${ganhouReal ? 'border-green-500 ring-4 ring-green-500/20' : 'border-amber-500'}`}>
+    <div className={`relative bg-slate-800 rounded-xl border-t-4 transition-all shadow-2xl flex flex-col gap-2 p-3 ${ganhouReal ? 'border-green-500 ring-4 ring-green-500/20' : 'border-amber-500'}`}>
       <div className="flex justify-between items-center px-1 mb-1 relative overflow-hidden">
         <div className="flex flex-col">
           <span className="text-[10px] font-black tracking-tighter opacity-50 uppercase">ID: #{cartela.id.slice(0, 4)}</span>
