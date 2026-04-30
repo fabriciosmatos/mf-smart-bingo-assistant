@@ -7,71 +7,7 @@ const STORAGE_KEY = 'bingo_pro_state_v2'; // Changed key to ensure clean state i
 
 export function useBingo() {
   const [estado, setEstado] = useState<JogoEstado>(() => {
-    try {
-      const salvo = localStorage.getItem(STORAGE_KEY);
-      if (salvo) {
-        const parsed = JSON.parse(salvo);
-        
-        if (parsed && typeof parsed === 'object') {
-          // Garantir campos de nível superior
-          const finalEstado: JogoEstado = {
-            cartelas: Array.isArray(parsed.cartelas) ? parsed.cartelas : [],
-            numerosSorteados: Array.isArray(parsed.numerosSorteados) ? parsed.numerosSorteados : [],
-            regras: (parsed.regras && typeof parsed.regras === 'object') ? parsed.regras : {
-              quadra: true,
-              quinaLinha: true,
-              quinaColuna: true,
-              quinaDiagonal: true,
-              bingo: true,
-            },
-            vitoriaRodada: parsed.vitoriaRodada !== undefined ? parsed.vitoriaRodada : null
-          };
-
-          // Migração de Regras
-          if (finalEstado.regras && !('quinaLinha' in finalEstado.regras)) {
-            const oldQuina = (finalEstado.regras as any).quina || false;
-            finalEstado.regras = {
-              ...(finalEstado.regras as any),
-              quinaLinha: oldQuina,
-              quinaColuna: oldQuina,
-              quinaDiagonal: oldQuina,
-              quadra: finalEstado.regras.quadra !== undefined ? finalEstado.regras.quadra : true,
-              bingo: finalEstado.regras.bingo !== undefined ? finalEstado.regras.bingo : true
-            };
-            delete (finalEstado.regras as any).quina;
-          }
-
-          // Migração de Cartelas
-          finalEstado.cartelas = finalEstado.cartelas.map((c: any) => {
-            if (!c || typeof c !== 'object') return null;
-            const updated = {
-              ...c,
-              dismissedVitorias: Array.isArray(c.dismissedVitorias) ? c.dismissedVitorias : []
-            };
-            
-            if (updated.vitoria && !('quinaLinha' in updated.vitoria)) {
-              const oldQuina = (updated.vitoria as any).quina || false;
-              updated.vitoria = {
-                ...updated.vitoria,
-                quinaLinha: oldQuina,
-                quinaColuna: oldQuina,
-                quinaDiagonal: oldQuina,
-                quadra: updated.vitoria.quadra || false,
-                bingo: updated.vitoria.bingo || false
-              };
-              delete (updated.vitoria as any).quina;
-            }
-            return updated;
-          }).filter((c): c is Cartela => c !== null);
-
-          return finalEstado;
-        }
-      }
-    } catch (e) {
-      console.error('Erro ao carregar estado salvo:', e);
-    }
-    
-    return {
+    const initialState: JogoEstado = {
       cartelas: [],
       numerosSorteados: [],
       regras: {
@@ -83,6 +19,69 @@ export function useBingo() {
       },
       vitoriaRodada: null
     };
+
+    try {
+      const salvo = localStorage.getItem(STORAGE_KEY);
+      if (!salvo) return initialState;
+
+      const parsed = JSON.parse(salvo);
+      if (!parsed || typeof parsed !== 'object') return initialState;
+
+      // Extract and validate top-level properties
+      const cartelasRaw = Array.isArray(parsed.cartelas) ? parsed.cartelas : [];
+      const numerosSorteados = Array.isArray(parsed.numerosSorteados) ? parsed.numerosSorteados : [];
+      const regrasRaw = (parsed.regras && typeof parsed.regras === 'object') ? parsed.regras : {};
+      
+      // Migration for rules
+      const rules: JogoEstado['regras'] = {
+        quadra: regrasRaw.quadra ?? true,
+        quinaLinha: regrasRaw.quinaLinha ?? regrasRaw.quina ?? true,
+        quinaColuna: regrasRaw.quinaColuna ?? regrasRaw.quina ?? true,
+        quinaDiagonal: regrasRaw.quinaDiagonal ?? regrasRaw.quina ?? true,
+        bingo: regrasRaw.bingo ?? true,
+      };
+
+      // Migration for cartelas
+      const cartelas: Cartela[] = cartelasRaw.map((c: any) => {
+        if (!c || typeof c !== 'object') return null;
+        
+        const vitoriaRaw = c.vitoria || {};
+        const vitoria = {
+          quadra: vitoriaRaw.quadra ?? false,
+          quinaLinha: vitoriaRaw.quinaLinha ?? vitoriaRaw.quina ?? false,
+          quinaColuna: vitoriaRaw.quinaColuna ?? vitoriaRaw.quina ?? false,
+          quinaDiagonal: vitoriaRaw.quinaDiagonal ?? vitoriaRaw.quina ?? false,
+          bingo: vitoriaRaw.bingo ?? false,
+        };
+
+        return {
+          id: c.id || (Math.random().toString(36).substring(2) + Date.now().toString(36)),
+          nome: c.nome || 'Cartela',
+          numeros: Array.isArray(c.numeros) ? c.numeros : [],
+          marcados: Array.isArray(c.marcados) ? c.marcados : [],
+          vitoria,
+          dismissedVitorias: Array.isArray(c.dismissedVitorias) ? c.dismissedVitorias : []
+        };
+      }).filter((c): c is Cartela => c !== null);
+
+      // Final validation of vitoriaRodada
+      let vitoriaRodadaResult = null;
+      if (parsed.vitoriaRodada && typeof parsed.vitoriaRodada === 'object' && 
+          parsed.vitoriaRodada.tipo && ['QUADRA', 'QUINA', 'BINGO'].includes(parsed.vitoriaRodada.tipo) &&
+          typeof parsed.vitoriaRodada.qtd === 'number') {
+        vitoriaRodadaResult = parsed.vitoriaRodada;
+      }
+
+      return {
+        cartelas,
+        numerosSorteados,
+        regras: rules,
+        vitoriaRodada: vitoriaRodadaResult
+      };
+    } catch (e) {
+      console.error('Erro ao carregar estado salvo:', e);
+      return initialState;
+    }
   });
 
   useEffect(() => {

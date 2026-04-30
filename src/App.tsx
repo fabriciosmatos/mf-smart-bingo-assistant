@@ -26,6 +26,17 @@ export default function App() {
   const [modoAdd, setModoAdd] = useState<'manual' | 'ocr' | 'lote'>('manual');
   const [showConfig, setShowConfig] = useState(false);
 
+  // Early return if state is not available (shouldn't happen with the new useBingo)
+  if (!estado || !estado.regras) {
+    return (
+      <div className="h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+        <Trophy size={48} className="text-amber-500 mb-4 animate-bounce" />
+        <h1 className="text-2xl font-black text-white mb-2 uppercase">Recuperando Sessão...</h1>
+        <p className="text-slate-400 text-sm max-w-xs">Aguarde enquanto preparamos sua mesa de bingo.</p>
+      </div>
+    );
+  }
+
   // Bloquear fechamento acidental
   React.useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
