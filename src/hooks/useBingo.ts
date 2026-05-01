@@ -15,6 +15,10 @@ export function useBingo() {
         quinaLinha: true,
         quinaColuna: true,
         quinaDiagonal: true,
+        letraX: false,
+        moldura: false,
+        losango: false,
+        cruz: false,
         bingo: true,
       },
       vitoriaRodada: null
@@ -27,35 +31,40 @@ export function useBingo() {
       const parsed = JSON.parse(salvo);
       if (!parsed || typeof parsed !== 'object') return initialState;
 
-      // Extract and validate top-level properties
       const cartelasRaw = Array.isArray(parsed.cartelas) ? parsed.cartelas : [];
       const numerosSorteados = Array.isArray(parsed.numerosSorteados) ? parsed.numerosSorteados : [];
       const regrasRaw = (parsed.regras && typeof parsed.regras === 'object') ? parsed.regras : {};
       
-      // Migration for rules
       const rules: JogoEstado['regras'] = {
         quadra: regrasRaw.quadra ?? true,
-        quinaLinha: regrasRaw.quinaLinha ?? regrasRaw.quina ?? true,
-        quinaColuna: regrasRaw.quinaColuna ?? regrasRaw.quina ?? true,
-        quinaDiagonal: regrasRaw.quinaDiagonal ?? regrasRaw.quina ?? true,
+        quinaLinha: regrasRaw.quinaLinha ?? true,
+        quinaColuna: regrasRaw.quinaColuna ?? true,
+        quinaDiagonal: regrasRaw.quinaDiagonal ?? true,
+        letraX: regrasRaw.letraX ?? false,
+        moldura: regrasRaw.moldura ?? false,
+        losango: regrasRaw.losango ?? false,
+        cruz: regrasRaw.cruz ?? false,
         bingo: regrasRaw.bingo ?? true,
       };
 
-      // Migration for cartelas
       const cartelas: Cartela[] = cartelasRaw.map((c: any) => {
         if (!c || typeof c !== 'object') return null;
         
         const vitoriaRaw = c.vitoria || {};
         const vitoria = {
           quadra: vitoriaRaw.quadra ?? false,
-          quinaLinha: vitoriaRaw.quinaLinha ?? vitoriaRaw.quina ?? false,
-          quinaColuna: vitoriaRaw.quinaColuna ?? vitoriaRaw.quina ?? false,
-          quinaDiagonal: vitoriaRaw.quinaDiagonal ?? vitoriaRaw.quina ?? false,
+          quinaLinha: vitoriaRaw.quinaLinha ?? false,
+          quinaColuna: vitoriaRaw.quinaColuna ?? false,
+          quinaDiagonal: vitoriaRaw.quinaDiagonal ?? false,
+          letraX: vitoriaRaw.letraX ?? false,
+          moldura: vitoriaRaw.moldura ?? false,
+          losango: vitoriaRaw.losango ?? false,
+          cruz: vitoriaRaw.cruz ?? false,
           bingo: vitoriaRaw.bingo ?? false,
         };
 
         return {
-          id: c.id || (Math.random().toString(36).substring(2) + Date.now().toString(36)),
+          id: c.id || Math.random().toString(36).substring(2),
           nome: c.nome || 'Cartela',
           numeros: Array.isArray(c.numeros) ? c.numeros : [],
           marcados: Array.isArray(c.marcados) ? c.marcados : [],
@@ -64,22 +73,13 @@ export function useBingo() {
         };
       }).filter((c): c is Cartela => c !== null);
 
-      // Final validation of vitoriaRodada
-      let vitoriaRodadaResult = null;
-      if (parsed.vitoriaRodada && typeof parsed.vitoriaRodada === 'object' && 
-          parsed.vitoriaRodada.tipo && ['QUADRA', 'QUINA', 'BINGO'].includes(parsed.vitoriaRodada.tipo) &&
-          typeof parsed.vitoriaRodada.qtd === 'number') {
-        vitoriaRodadaResult = parsed.vitoriaRodada;
-      }
-
       return {
         cartelas,
         numerosSorteados,
         regras: rules,
-        vitoriaRodada: vitoriaRodadaResult
+        vitoriaRodada: parsed.vitoriaRodada || null
       };
     } catch (e) {
-      console.error('Erro ao carregar estado salvo:', e);
       return initialState;
     }
   });
@@ -90,15 +90,17 @@ export function useBingo() {
 
   const adicionarCartela = useCallback((numeros: (number | null)[][], nome: string) => {
     const nova: Cartela = {
-      id: Math.random().toString(36).substring(2, 11) + Date.now().toString(36),
+      id: Math.random().toString(36).substring(2, 11),
       nome,
       numeros,
       marcados: numeros.map((fila, i) => fila.map((_, j) => (i === 2 && j === 2) ? true : false)),
-      vitoria: { quadra: false, quinaLinha: false, quinaColuna: false, quinaDiagonal: false, bingo: false },
+      vitoria: { 
+        quadra: false, quinaLinha: false, quinaColuna: false, quinaDiagonal: false, 
+        letraX: false, moldura: false, losango: false, cruz: false, bingo: false 
+      },
       dismissedVitorias: []
     };
     
-    // Marcar automaticamente se algum número já foi sorteado
     estado.numerosSorteados.forEach(num => {
       nova.numeros.forEach((fila, i) => {
         fila.forEach((n, j) => {
@@ -107,17 +109,11 @@ export function useBingo() {
       });
     });
 
-    setEstado(prev => ({
-      ...prev,
-      cartelas: [...prev.cartelas, nova]
-    }));
+    setEstado(prev => ({ ...prev, cartelas: [...prev.cartelas, nova] }));
   }, [estado.numerosSorteados]);
 
   const excluirCartela = useCallback((id: string) => {
-    setEstado(prev => ({
-      ...prev,
-      cartelas: prev.cartelas.filter(c => c.id !== id)
-    }));
+    setEstado(prev => ({ ...prev, cartelas: prev.cartelas.filter(c => c.id !== id) }));
   }, []);
 
   const sortearNumero = useCallback((num: number) => {
@@ -125,10 +121,10 @@ export function useBingo() {
 
     setEstado(prev => {
       const novosSorteados = [...prev.numerosSorteados, num];
-      
       let totalBingo = 0;
       let totalQuina = 0;
       let totalQuadra = 0;
+      let totalPadrao = 0;
 
       const novasCartelas = prev.cartelas.map(cartela => {
         const novaMarcada = cartela.marcados.map((fila, i) => 
@@ -138,11 +134,14 @@ export function useBingo() {
         const tempCartela: Cartela = { ...cartela, marcados: novaMarcada };
         const vitorias = verificarVitoria(tempCartela, prev.regras);
         
-        // Contabilizar novas vitórias para notificação agregada
         if (vitorias.includes('BINGO') && !cartela.vitoria.bingo) totalBingo++;
         else if ((vitorias.includes('QUINA_LINHA') || vitorias.includes('QUINA_COLUNA') || vitorias.includes('QUINA_DIAGONAL')) && 
                  (!cartela.vitoria.quinaLinha && !cartela.vitoria.quinaColuna && !cartela.vitoria.quinaDiagonal)) {
           totalQuina++;
+        }
+        else if ((vitorias.includes('LETRA_X') || vitorias.includes('MOLDURA') || vitorias.includes('LOSANGO') || vitorias.includes('CRUZ')) && 
+                (!cartela.vitoria.letraX && !cartela.vitoria.moldura && !cartela.vitoria.losango && !cartela.vitoria.cruz)) {
+          totalPadrao++;
         }
         else if (vitorias.includes('QUADRA') && !cartela.vitoria.quadra) {
           totalQuadra++;
@@ -156,32 +155,31 @@ export function useBingo() {
             quinaLinha: vitorias.includes('QUINA_LINHA'),
             quinaColuna: vitorias.includes('QUINA_COLUNA'),
             quinaDiagonal: vitorias.includes('QUINA_DIAGONAL'),
+            letraX: vitorias.includes('LETRA_X'),
+            moldura: vitorias.includes('MOLDURA'),
+            losango: vitorias.includes('LOSANGO'),
+            cruz: vitorias.includes('CRUZ'),
             bingo: vitorias.includes('BINGO')
           }
         };
       });
 
-      // Disparar notificação única para o tipo de vitória mais importante da rodada
       let vitoriaRodadaResult: JogoEstado['vitoriaRodada'] = null;
       if (totalBingo > 0) {
         dispararVitoria('BINGO', totalBingo);
         vitoriaRodadaResult = { tipo: 'BINGO', qtd: totalBingo };
-      }
-      else if (totalQuina > 0) {
+      } else if (totalQuina > 0) {
         dispararVitoria('QUINA', totalQuina);
         vitoriaRodadaResult = { tipo: 'QUINA', qtd: totalQuina };
-      }
-      else if (totalQuadra > 0) {
+      } else if (totalPadrao > 0) {
+        dispararVitoria('PADRÃO', totalPadrao);
+        vitoriaRodadaResult = { tipo: 'PADRÃO', qtd: totalPadrao };
+      } else if (totalQuadra > 0) {
         dispararVitoria('QUADRA', totalQuadra);
         vitoriaRodadaResult = { tipo: 'QUADRA', qtd: totalQuadra };
       }
 
-      return {
-        ...prev,
-        numerosSorteados: novosSorteados,
-        cartelas: novasCartelas,
-        vitoriaRodada: vitoriaRodadaResult
-      };
+      return { ...prev, numerosSorteados: novosSorteados, cartelas: novasCartelas, vitoriaRodada: vitoriaRodadaResult };
     });
   }, [estado.numerosSorteados]);
 
@@ -207,17 +205,17 @@ export function useBingo() {
       cartelas: prev.cartelas.map(c => ({
         ...c,
         marcados: c.marcados.map((f, i) => f.map((_, j) => (i === 2 && j === 2) ? true : false)),
-        vitoria: { quadra: false, quinaLinha: false, quinaColuna: false, quinaDiagonal: false, bingo: false },
+        vitoria: { 
+          quadra: false, quinaLinha: false, quinaColuna: false, quinaDiagonal: false,
+          letraX: false, moldura: false, losango: false, cruz: false, bingo: false 
+        },
         dismissedVitorias: []
       }))
     }));
   }, []);
 
   const toggleRegra = useCallback((regra: keyof JogoEstado['regras']) => {
-    setEstado(prev => ({
-      ...prev,
-      regras: { ...prev.regras, [regra]: !prev.regras[regra] }
-    }));
+    setEstado(prev => ({ ...prev, regras: { ...prev.regras, [regra]: !prev.regras[regra] } }));
   }, []);
 
   const dismissVitoriaRodada = useCallback(() => {
@@ -226,7 +224,7 @@ export function useBingo() {
       vitoriaRodada: null,
       cartelas: prev.cartelas.map(c => ({
         ...c,
-        dismissedVitorias: [...new Set([...c.dismissedVitorias, 'QUADRA', 'QUINA_LINHA', 'QUINA_COLUNA', 'QUINA_DIAGONAL', 'BINGO'])]
+        dismissedVitorias: [...new Set([...c.dismissedVitorias, 'QUADRA', 'QUINA_LINHA', 'QUINA_COLUNA', 'QUINA_DIAGONAL', 'LETRA_X', 'MOLDURA', 'LOSANGO', 'CRUZ', 'BINGO'])]
       }))
     }));
   }, []);
@@ -236,7 +234,7 @@ export function useBingo() {
       ...prev,
       cartelas: prev.cartelas.map(c => 
         c.id === cartelaId 
-          ? { ...c, dismissedVitorias: [...new Set([...c.dismissedVitorias, tipo, 'QUADRA', 'QUINA_LINHA', 'QUINA_COLUNA', 'QUINA_DIAGONAL', 'BINGO'])] }
+          ? { ...c, dismissedVitorias: [...new Set([...c.dismissedVitorias, tipo, 'QUADRA', 'QUINA_LINHA', 'QUINA_COLUNA', 'QUINA_DIAGONAL', 'LETRA_X', 'MOLDURA', 'LOSANGO', 'CRUZ', 'BINGO'])] }
           : c
       )
     }));

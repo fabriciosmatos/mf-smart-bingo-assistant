@@ -23,7 +23,11 @@ export default function App() {
   } = useBingo();
 
   const [abaAtiva, setAbaAtiva] = useState<'jogo' | 'add'>('jogo');
-  const [modoAdd, setModoAdd] = useState<'manual' | 'ocr' | 'lote'>('manual');
+  
+  // Verifica se temos chave para o scanner inteligente
+  const hasAIKey = !!(process.env.GEMINI_API_KEY);
+
+  const [modoAdd, setModoAdd] = useState<'manual' | 'ocr' | 'lote'>(hasAIKey ? 'ocr' : 'manual');
   const [showConfig, setShowConfig] = useState(false);
 
   // Early return if state is not available (shouldn't happen with the new useBingo)
@@ -68,35 +72,36 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-950/90 backdrop-blur-lg"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-xl"
             onClick={() => dismissVitoriaRodada()}
           >
             <motion.div 
-              initial={{ scale: 0.5, rotate: -10 }}
-              animate={{ scale: 1, rotate: 0 }}
-              exit={{ scale: 0.5, rotate: 10 }}
-              className="bg-green-500 text-slate-950 rounded-3xl p-8 shadow-[0_0_100px_rgba(34,197,94,0.6)] border-8 border-white/20 text-center relative max-w-sm w-full"
+              initial={{ scale: 0.5, rotateY: 180 }}
+              animate={{ scale: 1, rotateY: 0 }}
+              exit={{ scale: 0.5, opacity: 0 }}
+              className="bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 text-black rounded-3xl p-10 shadow-[0_0_150px_rgba(245,158,11,0.4)] border-8 border-white/20 text-center relative max-w-sm w-full"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white p-4 rounded-full shadow-2xl">
-                <Trophy size={48} className="text-amber-500" />
+              <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-white p-5 rounded-full shadow-2xl border-4 border-amber-600">
+                <Trophy size={56} className="text-amber-500" />
               </div>
-              <h2 className="text-5xl font-black mb-4 mt-4 tracking-tighter uppercase italic leading-none">
+              <h2 className="text-6xl font-black mb-4 mt-6 tracking-tighter uppercase italic leading-none drop-shadow-lg">
                 {estado.vitoriaRodada.tipo === 'BINGO' ? 'BINGO!' : 
-                 estado.vitoriaRodada.tipo === 'QUINA' ? 'QUINA!' : 'QUADRA!'}
+                 estado.vitoriaRodada.tipo === 'QUINA' ? 'QUINA!' : 
+                 estado.vitoriaRodada.tipo === 'PADRÃO' ? 'VITÓRIA!' : 'QUADRA!'}
               </h2>
-              <div className="bg-slate-950/20 py-3 rounded-xl mb-6">
-                <p className="text-xl font-bold tracking-tight">
+              <div className="bg-black/10 py-4 rounded-2xl mb-8">
+                <p className="text-2xl font-black tracking-tight uppercase">
                   {estado.vitoriaRodada.qtd > 1 
-                    ? `EM ${estado.vitoriaRodada.qtd} CARTELAS!` 
+                    ? `${estado.vitoriaRodada.qtd} GANHADORES!` 
                     : 'VOCÊ GANHOU!'}
                 </p>
               </div>
               <button 
                 onClick={() => dismissVitoriaRodada()}
-                className="w-full py-4 bg-slate-950 text-white rounded-2xl font-black tracking-widest text-lg uppercase shadow-xl hover:bg-slate-900 active:scale-95 transition-all flex items-center justify-center gap-2"
+                className="w-full py-5 bg-black text-amber-500 rounded-2xl font-black tracking-widest text-xl uppercase shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
               >
-                BOA! <LayoutGrid size={20} />
+                CELEBRAR! <Plus size={24} />
               </button>
             </motion.div>
           </motion.div>
@@ -150,15 +155,22 @@ export default function App() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-40 bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700 w-80"
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-40 bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700 w-[90%] max-w-[320px] max-h-[70vh] overflow-y-auto"
           >
-            <h3 className="text-[11px] uppercase font-bold text-slate-400 mb-4 tracking-widest">Regras de Vitória</h3>
+            <h3 className="text-[11px] uppercase font-bold text-slate-400 mb-4 tracking-widest flex justify-between items-center sticky top-0 bg-slate-800 pb-2 z-10">
+              Regras de Vitória
+              <span className="text-[9px] bg-slate-700 px-2 py-0.5 rounded">Deslize para ver</span>
+            </h3>
             <div className="space-y-2">
               {[
                 { id: 'quadra', label: 'Quadra (4 Cantos)' },
                 { id: 'quinaLinha', label: 'Quina (Linha)' },
                 { id: 'quinaColuna', label: 'Quina (Coluna)' },
                 { id: 'quinaDiagonal', label: 'Quina (Diagonal)' },
+                { id: 'letraX', label: 'Letra X' },
+                { id: 'moldura', label: 'Moldura (Bordas)' },
+                { id: 'losango', label: 'Losango / Diamante' },
+                { id: 'cruz', label: 'Cruz Central' },
                 { id: 'bingo', label: 'Bingo (Cheia)' }
               ].map(regra => (
                 <label key={regra.id} className="flex items-center justify-between p-3 bg-slate-900/50 rounded border border-slate-700 cursor-pointer">
@@ -257,14 +269,14 @@ export default function App() {
               >
                 <div className="flex gap-1 p-1 bg-slate-800 rounded-lg border border-slate-700">
                   {[
-                    { id: 'manual', label: 'MANUAL', icon: Plus },
-                    { id: 'ocr', label: 'FOTO/OCR', icon: Camera },
-                    { id: 'lote', label: 'LOTE/JSON', icon: LayoutGrid }
-                  ].map(modo => (
+                    { id: 'manual', label: 'MANUAL', icon: Plus, show: true },
+                    { id: 'ocr', label: 'SCANNER', icon: Camera, show: hasAIKey },
+                    { id: 'lote', label: 'COPIAR/COLAR', icon: LayoutGrid, show: true }
+                  ].filter(m => m.show).map(modo => (
                     <button 
                       key={modo.id}
                       onClick={() => setModoAdd(modo.id as any)}
-                      className={`flex-1 py-2 rounded font-bold text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${modoAdd === modo.id ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-slate-200'}`}
+                      className={`flex-1 py-2.5 rounded font-bold text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${modoAdd === modo.id ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                       <modo.icon size={14} /> {modo.label}
                     </button>

@@ -8,12 +8,25 @@ export interface Cartela {
     quinaLinha: boolean;
     quinaColuna: boolean;
     quinaDiagonal: boolean;
+    letraX: boolean;
+    moldura: boolean;
+    losango: boolean;
+    cruz: boolean;
     bingo: boolean;
   };
   dismissedVitorias: string[];
 }
 
-export type TipoVitoria = 'QUADRA' | 'QUINA_LINHA' | 'QUINA_COLUNA' | 'QUINA_DIAGONAL' | 'BINGO';
+export type TipoVitoria = 
+  | 'QUADRA' 
+  | 'QUINA_LINHA' 
+  | 'QUINA_COLUNA' 
+  | 'QUINA_DIAGONAL' 
+  | 'LETRA_X'
+  | 'MOLDURA'
+  | 'LOSANGO'
+  | 'CRUZ'
+  | 'BINGO';
 
 export interface JogoEstado {
   cartelas: Cartela[];
@@ -23,10 +36,14 @@ export interface JogoEstado {
     quinaLinha: boolean;
     quinaColuna: boolean;
     quinaDiagonal: boolean;
+    letraX: boolean;
+    moldura: boolean;
+    losango: boolean;
+    cruz: boolean;
     bingo: boolean;
   };
   vitoriaRodada?: {
-    tipo: 'QUADRA' | 'QUINA' | 'BINGO';
+    tipo: 'QUADRA' | 'QUINA' | 'BINGO' | 'PADRÃO';
     qtd: number;
   } | null;
 }

@@ -1,125 +1,80 @@
-import Tesseract from 'tesseract.js';
-import { GoogleGenAI } from "@google/genai";
-
-let aiInstance: GoogleGenAI | null = null;
-
-function getAI() {
-  if (!aiInstance) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn('OCR: GEMINI_API_KEY não encontrada nas variáveis de ambiente.');
-      return null;
-    }
-    console.log('OCR: Inicializando instância do Gemini com GoogleGenAI...');
-    aiInstance = new GoogleGenAI({ apiKey });
-  }
-  return aiInstance;
-}
-
-export async function processarImagemOCR(imageDataUrl: string): Promise<number[]> {
-  console.log('OCR: Iniciando processamento da imagem...');
-  let numerosTesseract: number[] = [];
-  
-  try {
-    console.log('OCR: Tentando Tesseract.js (v7)...');
-    const result = await Tesseract.recognize(imageDataUrl, 'eng', {
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          console.log('Tesseract:', Math.round(m.progress * 100) + '%');
-        }
-      }
-    });
-    
-    const text = result.data.text;
-    console.log('OCR: Texto extraído pelo Tesseract:', text);
-    
-    numerosTesseract = text
-      .split(/[^0-9]+/)
-      .map(s => parseInt(s.trim()))
-      .filter(n => !isNaN(n) && n > 0 && n <= 99);
-    
-    numerosTesseract = Array.from(new Set(numerosTesseract));
-    console.log('OCR: Números únicos (Tesseract):', numerosTesseract);
-  } catch (error) {
-    console.warn('OCR: Tesseract falhou, tentando Gemini...', error);
-  }
-
-  // Se o Tesseract falhou ou encontrou poucos números, usamos Gemini Vision
-  if (numerosTesseract.length < 15) {
-    console.log('OCR: Poucos números detectados. Recorrendo ao Gemini 3 Flash...');
-    try {
-      return await processarImagemComGemini(imageDataUrl);
-    } catch (error) {
-      console.error('OCR: Gemini falhou:', error);
-      return numerosTesseract; 
-    }
-  }
-
-  return numerosTesseract;
-}
-
-async function processarImagemComGemini(imageDataUrl: string): Promise<number[]> {
-  console.log('OCR: Preparando payload para Gemini Vision...');
-  const base64Data = imageDataUrl.split(',')[1];
-  const ai = getAI();
-  
-  if (!ai) {
-    throw new Error('IA não pôde ser inicializada. Verifique a sua chave de API.');
-  }
-
-  console.log('OCR: Enviando requisição ao Gemini...');
-  const result = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
-    contents: {
-      parts: [
-        {
-          inlineData: {
-            mimeType: "image/png",
-            data: base64Data,
-          },
-        },
-        {
-          text: "Extraia todos os números desta cartela de bingo 5x5 em ordem de leitura. Retorne apenas os números separados por vírgula. Ignore o texto 'Bingo' ou logos. Se houver um espaço vazio no meio (coringa), apenas pule-o.",
-        }
-      ]
-    }
-  });
-
-  const text = result.text || "";
-  console.log('OCR: Resposta do Gemini:', text);
-
-  const numeros: number[] = text
-    .split(/[^0-9]+/)
-    .map(s => parseInt(s.trim()))
-    .filter(n => !isNaN(n) && n >= 1 && n <= 99);
-  
-  const final = Array.from(new Set(numeros));
-  console.log('OCR: Números finais extraídos:', final);
-  return final;
-}
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 /**
- * Converte uma lista flat de números para uma grade 5x5.
- * Preenche com nulos se houver menos de 25 números.
+ * Serviço de OCR usando Gemini diretamente no Browser.
+ * Ideal para hospedagem estática (GitHub Pages).
  */
+
+const getAI = () => {
+  // O AI Studio injeta o GEMINI_API_KEY no process.env global
+  const apiKey = (process.env.GEMINI_API_KEY as string);
+  
+  if (!apiKey) {
+    throw new Error("API Key não encontrada.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+export async function processarImagemOCR(imageDataUrl: string): Promise<number[]> {
+  console.log('--- 🤖 OCR: Gemini 3 Flash (Client-Side) ---');
+  const startTime = Date.now();
+
+  try {
+    const ai = getAI();
+    const [header, base64] = imageDataUrl.split(",");
+    const mimeType = header.match(/:(.*?);/)?.[1] || "image/png";
+
+    const prompt = `
+      Examine esta imagem de uma cartela de Bingo 5x5 e extraia os números.
+      
+      Regras:
+      1. Retorne APENAS um JSON: {"numeros": [n1, n2, ..., n25]}
+      2. Ordem: esquerda para direita, linha por linha (5 colunas, 5 linhas).
+      3. O centro (espaço FREE) deve ser 0.
+      4. Colunas B(1-15), I(16-30), N(31-45), G(46-60), O(61-75).
+    `;
+
+    const response: GenerateContentResponse = await ai.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: {
+        parts: [
+          { text: prompt },
+          { inlineData: { data: base64, mimeType } }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+      }
+    });
+
+    const text = response.text || "{}";
+    const data = JSON.parse(text);
+    const numeros = data.numeros || [];
+
+    if (numeros.length !== 25) {
+      const fixed = [...numeros];
+      while (fixed.length < 25) fixed.push(0);
+      return fixed.slice(0, 25);
+    }
+
+    console.log(`✅ OCR Concluído em ${(Date.now() - startTime) / 1000}s`);
+    return numeros;
+
+  } catch (error) {
+    console.error('❌ Erro no OCR Gemini:', error);
+    return Array(25).fill(0);
+  }
+}
+
 export function formatarGrade(numeros: number[]): (number | null)[][] {
   const grade: (number | null)[][] = [];
-  const numbersWithJoker = [...numeros];
+  const safeNums = (numeros && numeros.length === 25) ? numeros : Array(25).fill(0);
   
-  // Se detectou 24 números, assume que o do meio é o coringa e insere null
-  if (numbersWithJoker.length === 24) {
-    numbersWithJoker.splice(12, 0, null as any);
-  }
-
   for (let i = 0; i < 5; i++) {
     const fila: (number | null)[] = [];
     for (let j = 0; j < 5; j++) {
-      if (i === 2 && j === 2) {
-        fila.push(null); // Centro é sempre coringa
-      } else {
-        const valor = numbersWithJoker[i * 5 + j];
-        fila.push(valor !== undefined ? valor : null);
-      }
+      const val = safeNums[i * 5 + j];
+      fila.push(val === 0 ? null : val);
     }
     grade.push(fila);
   }
