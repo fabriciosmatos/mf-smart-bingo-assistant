@@ -1,33 +1,37 @@
-import { createWorker } from 'tesseract.js';
+import Tesseract from 'tesseract.js';
 import { GoogleGenAI } from "@google/genai";
 
 let aiInstance: GoogleGenAI | null = null;
 
 function getAI() {
   if (!aiInstance) {
-    const apiKey = (process.env.GEMINI_API_KEY as string);
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.warn('GEMINI_API_KEY não encontrada nas variáveis de ambiente.');
+      console.warn('OCR: GEMINI_API_KEY não encontrada nas variáveis de ambiente.');
       return null;
     }
+    console.log('OCR: Inicializando instância do Gemini com GoogleGenAI...');
     aiInstance = new GoogleGenAI({ apiKey });
   }
   return aiInstance;
 }
 
 export async function processarImagemOCR(imageDataUrl: string): Promise<number[]> {
+  console.log('OCR: Iniciando processamento da imagem...');
   let numerosTesseract: number[] = [];
   
   try {
-    const worker = await createWorker('eng');
-    // Definir parâmetros para focar em números e melhorar segmentação
-    await worker.setParameters({
-      tessedit_char_whitelist: '0123456789',
-      tessedit_pageseg_mode: '6' as any,
+    console.log('OCR: Tentando Tesseract.js (v7)...');
+    const result = await Tesseract.recognize(imageDataUrl, 'eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          console.log('Tesseract:', Math.round(m.progress * 100) + '%');
+        }
+      }
     });
-
-    const { data: { text } } = await worker.recognize(imageDataUrl);
-    await worker.terminate();
+    
+    const text = result.data.text;
+    console.log('OCR: Texto extraído pelo Tesseract:', text);
     
     numerosTesseract = text
       .split(/[^0-9]+/)
@@ -35,17 +39,19 @@ export async function processarImagemOCR(imageDataUrl: string): Promise<number[]
       .filter(n => !isNaN(n) && n > 0 && n <= 99);
     
     numerosTesseract = Array.from(new Set(numerosTesseract));
+    console.log('OCR: Números únicos (Tesseract):', numerosTesseract);
   } catch (error) {
-    console.warn('Tesseract falhou, tentando Gemini...', error);
+    console.warn('OCR: Tesseract falhou, tentando Gemini...', error);
   }
 
-  // Se o Tesseract falhou ou encontrou poucos números (menos de 15 de 25), usamos Gemini Vision
+  // Se o Tesseract falhou ou encontrou poucos números, usamos Gemini Vision
   if (numerosTesseract.length < 15) {
+    console.log('OCR: Poucos números detectados. Recorrendo ao Gemini 3 Flash...');
     try {
       return await processarImagemComGemini(imageDataUrl);
     } catch (error) {
-      console.error('Gemini OCR falhou:', error);
-      return numerosTesseract; // Retorna o que o Tesseract conseguiu, se houver
+      console.error('OCR: Gemini falhou:', error);
+      return numerosTesseract; 
     }
   }
 
@@ -53,14 +59,16 @@ export async function processarImagemOCR(imageDataUrl: string): Promise<number[]
 }
 
 async function processarImagemComGemini(imageDataUrl: string): Promise<number[]> {
+  console.log('OCR: Preparando payload para Gemini Vision...');
   const base64Data = imageDataUrl.split(',')[1];
   const ai = getAI();
   
   if (!ai) {
-    throw new Error('IA não pôde ser inicializada. Verifique a chave de API.');
+    throw new Error('IA não pôde ser inicializada. Verifique a sua chave de API.');
   }
 
-  const response = await ai.models.generateContent({
+  console.log('OCR: Enviando requisição ao Gemini...');
+  const result = await ai.models.generateContent({
     model: "gemini-3-flash-preview",
     contents: {
       parts: [
@@ -71,19 +79,23 @@ async function processarImagemComGemini(imageDataUrl: string): Promise<number[]>
           },
         },
         {
-          text: "Extraia todos os números desta cartela de bingo 5x5 em ordem de leitura. Retorne apenas os números separados por vírgula. Ignore cabeçalhos e logos.",
+          text: "Extraia todos os números desta cartela de bingo 5x5 em ordem de leitura. Retorne apenas os números separados por vírgula. Ignore o texto 'Bingo' ou logos. Se houver um espaço vazio no meio (coringa), apenas pule-o.",
         }
       ]
     }
   });
 
-  const text = response.text || "";
-  const numeros = text
+  const text = result.text || "";
+  console.log('OCR: Resposta do Gemini:', text);
+
+  const numeros: number[] = text
     .split(/[^0-9]+/)
     .map(s => parseInt(s.trim()))
-    .filter(n => !isNaN(n) && n >= 0 && n <= 99);
+    .filter(n => !isNaN(n) && n >= 1 && n <= 99);
   
-  return Array.from(new Set(numeros));
+  const final = Array.from(new Set(numeros));
+  console.log('OCR: Números finais extraídos:', final);
+  return final;
 }
 
 /**

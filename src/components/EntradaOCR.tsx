@@ -21,17 +21,21 @@ export function EntradaOCR({ onSalvar }: Props) {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log('EntradaOCR: Arquivo selecionado:', file.name, file.type);
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
+        console.log('EntradaOCR: FileReader carregado. Tamanho do DataURL:', dataUrl.length);
         const img = new Image();
         img.onload = () => {
+          console.log('EntradaOCR: Imagem carregada no objeto Image. Dimensões:', img.width, 'x', img.height);
           const processedUrl = processarImagemNoCanvas(img);
           if (processedUrl) {
             setPreview(processedUrl);
             processarOCR(processedUrl);
           }
         };
+        img.onerror = (err) => console.error('EntradaOCR: Erro ao carregar imagem via FileReader:', err);
         img.src = dataUrl;
       };
       reader.readAsDataURL(file);
@@ -39,6 +43,7 @@ export function EntradaOCR({ onSalvar }: Props) {
   };
 
   const processarImagemNoCanvas = (source: HTMLVideoElement | HTMLImageElement) => {
+    console.log('EntradaOCR: Processando imagem no Canvas...');
     if (canvasRef.current) {
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
@@ -46,16 +51,25 @@ export function EntradaOCR({ onSalvar }: Props) {
         const width = source instanceof HTMLVideoElement ? source.videoWidth : source.width;
         const height = source instanceof HTMLVideoElement ? source.videoHeight : source.height;
         
+        console.log('EntradaOCR: Dimensões do Canvas:', width, 'x', height);
         canvas.width = width;
         canvas.height = height;
         
-        // Melhora a detecção removendo cores e aumentando o contraste
-        context.filter = 'grayscale(100%) contrast(200%) brightness(110%)';
+        // Tenta aplicar filtros para melhorar OCR, mas garante fallback
+        try {
+          context.filter = 'grayscale(100%) contrast(200%) brightness(110%)';
+        } catch (e) {
+          console.warn('EntradaOCR: Filtros de canvas não suportados neste navegador.');
+        }
+
         context.drawImage(source, 0, 0, width, height);
         
-        return canvas.toDataURL('image/png');
+        const pngUrl = canvas.toDataURL('image/png');
+        console.log('EntradaOCR: Canvas convertido para PNG. Tamanho:', pngUrl.length);
+        return pngUrl;
       }
     }
+    console.error('EntradaOCR: Falha ao obter contexto do canvas.');
     return null;
   };
 
@@ -94,11 +108,17 @@ export function EntradaOCR({ onSalvar }: Props) {
 
   const processarOCR = async (url: string) => {
     setProcessando(true);
+    console.log('EntradaOCR: Iniciando chamada do serviço de OCR...');
     try {
       const nums = await processarImagemOCR(url);
+      console.log('EntradaOCR: Números recebidos do serviço:', nums);
       setNumeros(nums);
+      if (nums.length === 0) {
+        console.warn('EntradaOCR: O serviço retornou uma lista vazia de números.');
+      }
     } catch (err) {
-      alert('Falha ao ler números. Tente novamente.');
+      console.error('EntradaOCR: Erro no processamento OCR:', err);
+      alert('Falha ao ler números. Tente aproximar a câmera ou usar uma foto mais nítida.');
     } finally {
       setProcessando(false);
     }
