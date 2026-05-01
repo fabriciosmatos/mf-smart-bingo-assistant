@@ -155,13 +155,13 @@ export default function App() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 left-1/2 -translate-x-1/2 z-40 bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700 w-[90%] max-w-[320px] max-h-[70vh] overflow-y-auto"
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-40 bg-slate-800 rounded-xl p-6 shadow-2xl border border-slate-700 w-[90%] max-w-[320px] max-h-[80vh] overflow-y-auto"
           >
-            <h3 className="text-[11px] uppercase font-bold text-slate-400 mb-4 tracking-widest flex justify-between items-center sticky top-0 bg-slate-800 pb-2 z-10">
+            <h3 className="text-[11px] uppercase font-bold text-slate-400 mb-4 tracking-widest flex justify-between items-center sticky -top-6 bg-slate-800 pt-1 pb-3 z-10 border-b border-slate-700/50">
               Regras de Vitória
-              <span className="text-[9px] bg-slate-700 px-2 py-0.5 rounded">Deslize para ver</span>
+              <span className="text-[9px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded border border-amber-500/20">Ativas</span>
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1.5 pt-2">
               {[
                 { id: 'quadra', label: 'Quadra (4 Cantos)' },
                 { id: 'quinaLinha', label: 'Quina (Linha)' },

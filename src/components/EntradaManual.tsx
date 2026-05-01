@@ -34,8 +34,27 @@ export function EntradaManual({ onSalvar }: Props) {
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent, i: number, j: number) => {
+    if (e.key === 'Enter') {
+      let nextJ = (j + 1) % 5;
+      let nextI = nextJ === 0 ? i + 1 : i;
+      
+      if (nextI === 2 && nextJ === 2) {
+        nextJ = (nextJ + 1) % 5;
+        nextI = nextJ === 0 ? nextI + 1 : nextI;
+      }
+
+      if (nextI < 5) {
+        const nextId = `cell-${nextI}-${nextJ}`;
+        document.getElementById(nextId)?.focus();
+      } else {
+        handleSalvar();
+      }
+    }
+  };
+
   const handleSalvar = () => {
-    const final: (number | null)[][] = grade.map(fila => fila.map(v => v === '' ? null : parseInt(v)));
+    const final: (number | null)[][] = grade.map(fila => fila.map(v => v === '' || isNaN(parseInt(v)) ? null : parseInt(v)));
     onSalvar(final, nome || 'Cartela ' + Math.floor(Math.random() * 1000));
   };
 
@@ -68,6 +87,7 @@ export function EntradaManual({ onSalvar }: Props) {
                     value={isCenter ? '' : valor}
                     disabled={isCenter}
                     onChange={(e) => handleMudar(i, j, e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, i, j)}
                     className={`w-full h-full bg-slate-950 border border-slate-700 rounded-md text-center font-black text-xs sm:text-sm focus:bg-amber-500 focus:text-slate-950 focus:border-amber-400 focus:outline-none transition-all tabular-nums ${isCenter ? 'opacity-50 !bg-slate-800' : ''}`}
                   />
                   {isCenter && (

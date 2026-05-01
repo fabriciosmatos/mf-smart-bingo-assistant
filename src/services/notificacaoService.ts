@@ -1,9 +1,9 @@
 import confetti from 'canvas-confetti';
 
-export function dispararVitoria(tipo: 'QUADRA' | 'QUINA' | 'BINGO', qtd: number = 1) {
+export function dispararVitoria(tipo: 'QUADRA' | 'QUINA' | 'BINGO' | 'PADRÃO', qtd: number = 1) {
   // Vibrar dispositivo
   if ('vibrate' in navigator) {
-    const padrao = tipo === 'BINGO' ? [200, 100, 200, 100, 200] : [200, 100, 200];
+    const padrao = (tipo === 'BINGO' || tipo === 'PADRÃO') ? [200, 100, 200, 100, 200] : [200, 100, 200];
     navigator.vibrate(padrao);
   }
 
